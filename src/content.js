@@ -156,10 +156,8 @@ function createVideoController(video) {
       savedPlaybackSpeed = result[`speed_${currentHostname}`];
       // Apply saved speed to the video after a short delay to ensure it loads
       setTimeout(() => {
-        if (!video.paused) { // Only apply if video is playing
-          video.playbackRate = savedPlaybackSpeed;
-          updateControllerStatus(video, shadowRoot.querySelector('.video-controller-nudge'), shadowRoot.querySelector('.play-pause'));
-        }
+        video.playbackRate = savedPlaybackSpeed;
+        updateControllerStatus(video, shadowRoot.querySelector('.video-controller-nudge'), shadowRoot.querySelector('.play-pause'));
       }, 500);
     }
   });
