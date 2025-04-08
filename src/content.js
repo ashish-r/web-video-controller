@@ -131,10 +131,26 @@ function initializeVideoController() {
   observer.observe(document.body, { childList: true, subtree: true });
 }
 
+function setPlaybackSpeedAndUI(video) {
+  // Get saved playback speed for this site
+  let savedPlaybackSpeed = 1.0;
+  chrome.storage.local.get(`speed_${currentHostname}`, (result) => {
+    if (result[`speed_${currentHostname}`]) {
+      savedPlaybackSpeed = result[`speed_${currentHostname}`];
+      // Apply saved speed to the video after a short delay to ensure it loads
+      setTimeout(() => {
+        video.playbackRate = savedPlaybackSpeed;
+        updateControllerStatus(video, shadowRoot.querySelector('.video-controller-nudge'), shadowRoot.querySelector('.play-pause'));
+      }, 500);
+    }
+  });
+}
+
 // Create video controller UI
 function createVideoController(video) {
   // Check if controller already exists for this video
   if (video.hasAttribute('data-controller-added')) {
+    setPlaybackSpeedAndUI(video);
     return;
   }
   
@@ -149,18 +165,7 @@ function createVideoController(video) {
   // Create shadow root
   const shadowRoot = shadowContainer.attachShadow({ mode: 'closed' });
   
-  // Get saved playback speed for this site
-  let savedPlaybackSpeed = 1.0;
-  chrome.storage.local.get(`speed_${currentHostname}`, (result) => {
-    if (result[`speed_${currentHostname}`]) {
-      savedPlaybackSpeed = result[`speed_${currentHostname}`];
-      // Apply saved speed to the video after a short delay to ensure it loads
-      setTimeout(() => {
-        video.playbackRate = savedPlaybackSpeed;
-        updateControllerStatus(video, shadowRoot.querySelector('.video-controller-nudge'), shadowRoot.querySelector('.play-pause'));
-      }, 500);
-    }
-  });
+  setPlaybackSpeedAndUI(video);
   
   shadowRoot.innerHTML = `
     <style>
