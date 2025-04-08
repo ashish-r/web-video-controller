@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Video Controls Extension</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <h1>Video Controls</h1>
+    
+    <div class="site-toggle">
+      <div class="site-info">
+        <span>Current site:</span>
+        <span id="current-hostname" class="hostname"></span>
+      </div>
+      
+      <div class="toggle-container">
+        <label class="switch">
+          <input type="checkbox" id="site-toggle">
+          <span class="slider round"></span>
+        </label>
+        <span id="toggle-status">Enabled</span>
+      </div>
+    </div>
+    
+    <div class="speed-container">
+      <h2>Playback Speed</h2>
+      <div class="speed-slider-container">
+        <input type="range" min="0.1" max="5" step="0.1" value="1" class="speed-slider" id="speed-slider">
+        <div class="speed-value-container">
+          <span id="speed-value">1.0x</span>
+        </div>
+      </div>
+      <div class="speed-presets">
+        <button class="speed-preset" data-speed="0.5">0.5x</button>
+        <button class="speed-preset" data-speed="1">1x</button>
+        <button class="speed-preset" data-speed="1.5">1.5x</button>
+        <button class="speed-preset" data-speed="2">2x</button>
+        <button class="speed-preset" data-speed="3">3x</button>
+      </div>
+    </div>
+    
+    <div class="controls-info">
+      <h2>Controls</h2>
+      <ul>
+        <li><span class="icon">►/❚❚</span> Play/Pause</li>
+        <li><span class="icon">−</span> Decrease Speed (0.1x steps)</li>
+        <li><span class="icon">+</span> Increase Speed (0.2x steps)</li>
+        <li><span class="icon close-icon">×</span> Disable Controls for This Site</li>
+      </ul>
+    </div>
+    
+    <div class="keyboard-shortcuts">
+      <h2>Keyboard Shortcuts</h2>
+      <ul>
+        <li><span class="key">Space</span> or <span class="key">P</span> Play/Pause</li>
+        <li><span class="key">+</span> Increase Speed (0.2x)</li>
+        <li><span class="key">-</span> Decrease Speed (0.1x)</li>
+      </ul>
+      <p class="note">*Click on minimized widget to reset speed to 1x or toggle play/pause.</p>
+    </div>
+    
+    <div class="footer">
+      <p>Hover over the controller to show options</p>
+    </div>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>

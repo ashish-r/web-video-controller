@@ -1,0 +1,8 @@
+/* Shadow DOM container styles */
+.video-controls-shadow-container {
+  all: initial !important;
+  position: absolute;
+  z-index: 9999;
+}
+
+/* Note: Most of our styles have been moved to the shadow DOM in content.js */
