@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Web Video Player: NudgePlay",
+  "name": "Web Video Controller - NudgePlay",
   "version": "1.0",
   "description": "Enhanced video controls for web videos",
   "permissions": ["storage", "activeTab"],
