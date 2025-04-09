@@ -7,114 +7,92 @@ const speedValue = document.getElementById('speed-value');
 const speedPresets = document.querySelectorAll('.speed-preset');
 
 let currentHostname = '';
-let currentSpeed = 1.0;
 
 // Initialize the popup
 function initPopup() {
   // Get current site status
   chrome.runtime.sendMessage({ action: 'getCurrentSiteStatus' }, (response) => {
-    if (!response) return;
-    
-    // Update hostname display
-    currentHostname = response.hostname || 'Not available';
-    currentHostnameEl.textContent = currentHostname;
-    
-    // Update toggle state
-    siteToggle.checked = !response.disabled;
-    toggleStatus.textContent = response.disabled ? 'Disabled' : 'Enabled';
-    
-    // Update speed slider
-    currentSpeed = response.speed;
-    speedSlider.value = currentSpeed;
-    speedValue.textContent = `${currentSpeed.toFixed(1)}x`;
-    
-    // Update speed preset buttons
-    updateSpeedPresetButtons();
-    
-    // Enable/disable speed controls based on toggle state
-    const isEnabled = !response.disabled;
-    speedSlider.disabled = !isEnabled;
-    speedPresets.forEach(btn => btn.disabled = !isEnabled);
-    
-    if (!isEnabled) {
-      speedSlider.classList.add('disabled');
-      speedPresets.forEach(btn => btn.classList.add('disabled'));
-    } else {
-      speedSlider.classList.remove('disabled');
-      speedPresets.forEach(btn => btn.classList.remove('disabled'));
-    }
-    
     // If we don't have a valid hostname, disable the controls
-    if (!response.hostname) {
+    if (!response?.hostname) {
       siteToggle.disabled = true;
       speedSlider.disabled = true;
       speedPresets.forEach(btn => btn.disabled = true);
       toggleStatus.textContent = 'Not available on this page';
+      return;
     }
+    
+    // Update hostname display
+    currentHostname = response.hostname;
+    currentHostnameEl.textContent = currentHostname;
+    
+    handleDisableChange(response.disabled);
+    updateSpeedPresetButtons(response.speed);
+
+    // Add listener for chrome.storage.local changes
+    chrome.storage.onChanged.addListener((changes, namespace) => {
+      // Only proceed if this is from local storage
+      if (namespace !== 'local') return;
+      
+      // Check if disabledSites has changed
+      if (changes.disabledSites) {
+        const newDisabledSites = changes.disabledSites.newValue || [];
+        const isCurrentSiteDisabled = newDisabledSites.includes(currentHostname);
+        handleDisableChange(isCurrentSiteDisabled);
+      }
+      
+      // Check if speed setting for current hostname has changed
+      const speedKey = `speed_${currentHostname}`;
+      if (changes[speedKey]) {
+        updateSpeedPresetButtons(changes[speedKey].newValue || 1.0);
+      }
+    });
   });
 }
 
-// Toggle site status
-siteToggle.addEventListener('change', () => {
-  const isEnabled = siteToggle.checked;
-  
+function handleDisableChange (isDisabled) {
+  siteToggle.checked = !isDisabled;
   // Update UI
-  toggleStatus.textContent = isEnabled ? 'Enabled' : 'Disabled';
+  toggleStatus.textContent = isDisabled ? 'Disabled' : 'Enabled';
   
   // Enable/disable speed controls based on toggle state
-  speedSlider.disabled = !isEnabled;
-  speedPresets.forEach(btn => btn.disabled = !isEnabled);
+  speedSlider.disabled = isDisabled;
+  speedPresets.forEach(btn => btn.disabled = isDisabled);
   
-  if (!isEnabled) {
+  if (isDisabled) {
     speedSlider.classList.add('disabled');
     speedPresets.forEach(btn => btn.classList.add('disabled'));
   } else {
     speedSlider.classList.remove('disabled');
     speedPresets.forEach(btn => btn.classList.remove('disabled'));
   }
+}
+
+// Toggle site status
+siteToggle.addEventListener('change', () => {
+  const isEnabled = siteToggle.checked;
+  handleDisableChange(!isEnabled)
   
-  // Send message to content script
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    if (tabs && tabs.length > 0) {
-      chrome.tabs.sendMessage(
-        tabs[0].id,
-        { action: 'toggleSiteDisabled', disabled: !isEnabled },
-        (response) => {
-          // Handle response
-          console.log('Toggle response:', response);
-          
-          // If no response, it could be that the content script isn't loaded yet
-          if (chrome.runtime.lastError) {
-            console.log('Error:', chrome.runtime.lastError);
-            // Update the storage directly in case content script isn't loaded
-            chrome.runtime.sendMessage({ 
-              action: 'getCurrentSiteStatus'
-            }, (statusResponse) => {
-              if (statusResponse && statusResponse.hostname) {
-                chrome.storage.local.get('disabledSites', (result) => {
-                  let disabledSites = result.disabledSites || [];
-                  
-                  if (!isEnabled && !disabledSites.includes(statusResponse.hostname)) {
-                    disabledSites.push(statusResponse.hostname);
-                  } else if (isEnabled) {
-                    disabledSites = disabledSites.filter(site => site !== statusResponse.hostname);
-                  }
-                  
-                  chrome.storage.local.set({ disabledSites });
-                });
-              }
-            });
-          }
-        }
-      );
+  
+  chrome.storage.local.get(['disabledSites'], (result) => {
+    const disabledSites = result.disabledSites || [];
+    
+    if (isEnabled) {
+      // Enable site
+      if (disabledSites.includes(currentHostname)) {
+        disabledSites.splice(disabledSites.indexOf(currentHostname), 1);
+      }
+    } else if (!disabledSites.includes(currentHostname)) {
+      disabledSites.push(currentHostname);
     }
+    
+    // Save updated disabled sites list
+    chrome.storage.local.set({ disabledSites: disabledSites });
   });
 });
 
 // Handle speed slider changes
 speedSlider.addEventListener('input', () => {
   const newSpeed = parseFloat(speedSlider.value);
-  speedValue.textContent = `${newSpeed.toFixed(1)}x`;
   updateSpeedPresetButtons(newSpeed);
 });
 
@@ -127,8 +105,6 @@ speedSlider.addEventListener('change', () => {
 speedPresets.forEach(btn => {
   btn.addEventListener('click', () => {
     const presetSpeed = parseFloat(btn.dataset.speed);
-    speedSlider.value = presetSpeed;
-    speedValue.textContent = `${presetSpeed.toFixed(2)}x`;
     updateSpeedPresetButtons(presetSpeed);
     setPlaybackSpeed(presetSpeed);
   });
@@ -136,23 +112,14 @@ speedPresets.forEach(btn => {
 
 // Set playback speed
 function setPlaybackSpeed(speed) {
-  currentSpeed = speed;
   
-  // Send message to update speed
-  chrome.runtime.sendMessage({
-    action: 'setPlaybackSpeed',
-    hostname: currentHostname,
-    speed: speed
-  }, (response) => {
-    // Handle response if needed
-    console.log('Speed update response:', response);
-  });
+  chrome.storage.local.set({ [`speed_${currentHostname}`]: speed });
 }
 
 // Update speed preset buttons
 function updateSpeedPresetButtons(speed) {
-  speed = speed || currentSpeed;
-  
+  speedValue.textContent = `${speed.toFixed(1)}x`;
+  speedSlider.value = speed;
   speedPresets.forEach(btn => {
     const presetSpeed = parseFloat(btn.dataset.speed);
     if (presetSpeed === speed) {
@@ -162,16 +129,6 @@ function updateSpeedPresetButtons(speed) {
     }
   });
 }
-
-// Listen for speed changes from content script
-chrome.runtime.onMessage.addListener((message) => {
-  if (message.action === 'speedChanged' && message.hostname === currentHostname) {
-    currentSpeed = message.speed;
-    speedSlider.value = currentSpeed;
-    speedValue.textContent = `${currentSpeed.toFixed(2)}x`;
-    updateSpeedPresetButtons();
-  }
-});
 
 // Initialize when popup opens
 document.addEventListener('DOMContentLoaded', initPopup);

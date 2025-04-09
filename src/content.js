@@ -1,24 +1,72 @@
 // Global variables
-let disabledSites = [];
 const currentHostname = window.location.hostname;
 let activeVideos = []; // Track active videos for keyboard shortcuts
 
-// Check if the current site is disabled
-function isCurrentSiteDisabled() {
-  return disabledSites.includes(currentHostname);
+
+function tearDownUI() {
+  // Remove all controllers
+  document.querySelectorAll('.video-controls-shadow-container').forEach(container => {
+    container.remove();
+  });
+      
+  document.querySelectorAll('video').forEach(video => {
+    video.removeAttribute('data-nudgeplay-controller-added');
+  });
+      
+  // Clear active videos
+  activeVideos = [];
+  
+  // Remove keyboard shortcuts
+  document.removeEventListener('keydown', setupKeyboardShortcuts);
+
+  document.querySelectorAll('video').forEach(video => {
+    video.playbackRate = 1;
+  });
 }
 
+
 // Load disabled sites from storage
-function loadDisabledSites() {
+function init() {
+  let isDisabled = false; // Track if the site is disabled
+  
   chrome.storage.local.get('disabledSites', (result) => {
-    disabledSites = result.disabledSites || [];
-    
+    const disabledSites = result.disabledSites || [];
     // If site is not disabled, initialize the controller
-    if (!isCurrentSiteDisabled()) {
+    if (!disabledSites.includes(currentHostname)) {
       initializeVideoController();
       
       // Setup keyboard shortcuts
       setupKeyboardShortcuts();
+    }
+    else {
+      isDisabled = true;
+    }
+  });
+
+  chrome.storage.onChanged.addListener((changes, namespace) => {
+    // Only proceed if this is from local storage
+    if (namespace !== 'local') return;
+    
+    // Check if disabledSites has changed
+    if (changes.disabledSites) {
+      const newDisabledSites = changes.disabledSites.newValue || [];
+      const isCurrentSiteDisabled = newDisabledSites.includes(currentHostname);
+      if (!isDisabled && isCurrentSiteDisabled) {
+        tearDownUI();
+      }
+    }
+    
+    // Check if speed setting for current hostname has changed
+    const speedKey = `speed_${currentHostname}`;
+    if (changes[speedKey] && !isDisabled) {
+      const newSpeed = changes[speedKey].newValue || 1.0;
+      if (newSpeed === changes[speedKey].oldValue) {
+        return;
+      }
+      document.querySelectorAll('video').forEach(video => {
+        video.playbackRate = newSpeed;
+        // call update controller status
+      });
     }
   });
 }
@@ -53,9 +101,10 @@ function setupKeyboardShortcuts() {
         pendingActions[e.key] = setTimeout(() => {
           // Only proceed if the playback rate hasn't changed
           if (targetVideo.playbackRate === currentSpeedUp) {
-            let newSpeedUp = currentSpeedUp + 0.2;
-            newSpeedUp = Math.round(newSpeedUp * 100) / 100;
-            targetVideo.playbackRate = Math.min(5, newSpeedUp);
+            let newSpeedUp = currentSpeedUp + 0.1;
+            newSpeedUp = Math.min(5, Math.round(newSpeedUp * 100) / 100);
+            targetVideo.playbackRate = newSpeedUp;
+            chrome.storage.local.set({ [`speed_${currentHostname}`]: newSpeedUp});
           }
           delete pendingActions[e.key];
         }, 200);
@@ -69,8 +118,9 @@ function setupKeyboardShortcuts() {
           // Only proceed if the playback rate hasn't changed
           if (targetVideo.playbackRate === currentSpeedDown) {
             let newSpeedDown = currentSpeedDown - 0.1;
-            newSpeedDown = Math.round(newSpeedDown * 100) / 100;
-            targetVideo.playbackRate = Math.max(0.1, newSpeedDown);
+            newSpeedDown = Math.max(0.1, Math.round(newSpeedDown * 100) / 100);
+            targetVideo.playbackRate = newSpeedDown;
+            chrome.storage.local.set({ [`speed_${currentHostname}`]: newSpeedDown});
           }
           delete pendingActions[e.key];
         }, 200);
@@ -131,31 +181,15 @@ function initializeVideoController() {
   observer.observe(document.body, { childList: true, subtree: true });
 }
 
-function setPlaybackSpeedAndUI(video) {
-  // Get saved playback speed for this site
-  let savedPlaybackSpeed = 1.0;
-  chrome.storage.local.get(`speed_${currentHostname}`, (result) => {
-    if (result[`speed_${currentHostname}`]) {
-      savedPlaybackSpeed = result[`speed_${currentHostname}`];
-      // Apply saved speed to the video after a short delay to ensure it loads
-      setTimeout(() => {
-        video.playbackRate = savedPlaybackSpeed;
-        updateControllerStatus(video, shadowRoot.querySelector('.video-controller-nudge'), shadowRoot.querySelector('.play-pause'));
-      }, 500);
-    }
-  });
-}
-
 // Create video controller UI
 function createVideoController(video) {
   // Check if controller already exists for this video
-  if (video.hasAttribute('data-controller-added')) {
-    setPlaybackSpeedAndUI(video);
+  if (video.hasAttribute('data-nudgeplay-controller-added')) {
     return;
   }
   
   // Mark this video as having a controller
-  video.setAttribute('data-controller-added', 'true');
+  video.setAttribute('data-nudgeplay-controller-added', 'true');
   
   // Create shadow DOM container
   const shadowContainer = document.createElement('div');
@@ -165,7 +199,16 @@ function createVideoController(video) {
   // Create shadow root
   const shadowRoot = shadowContainer.attachShadow({ mode: 'closed' });
   
-  setPlaybackSpeedAndUI(video);
+    chrome.storage.local.get(`speed_${currentHostname}`, (result) => {
+      if (result[`speed_${currentHostname}`]) {
+        const savedPlaybackSpeed = result[`speed_${currentHostname}`];
+        // Apply saved speed to the video after a short delay to ensure it loads
+        setTimeout(() => {
+          video.playbackRate = savedPlaybackSpeed;
+          updateControllerStatus(video, shadowRoot.querySelector('.video-controller-nudge'), shadowRoot.querySelector('.play-pause'));
+        }, 500);
+      }
+    });
   
   shadowRoot.innerHTML = `
     <style>
@@ -343,6 +386,16 @@ function createVideoController(video) {
   video.addEventListener('play', (e) => {
     updateControllerStatus(video, controllerNudge, playPauseBtn);
     controllerContainer.classList.add('playing');
+    chrome.storage.local.get(`speed_${currentHostname}`, (result) => {
+      if (result[`speed_${currentHostname}`]) {
+        const savedPlaybackSpeed = result[`speed_${currentHostname}`];
+        // Apply saved speed to the video after a short delay to ensure it loads
+        setTimeout(() => {
+          video.playbackRate = savedPlaybackSpeed;
+          updateControllerStatus(video, controllerNudge, playPauseBtn);
+        }, 500);
+      }
+    });
   });
   
   video.addEventListener('pause', (e) => {
@@ -351,15 +404,13 @@ function createVideoController(video) {
   });
   
   video.addEventListener('ratechange', (e) => {
-    updateControllerStatus(video, controllerNudge, playPauseBtn);
-    // Save the new playback speed
-    chrome.storage.local.set({ [`speed_${currentHostname}`]: video.playbackRate });
-    // Notify the popup if it's open
-    chrome.runtime.sendMessage({
-      action: 'speedChanged',
-      hostname: currentHostname,
-      speed: video.playbackRate
-    });
+    if (video.hasAttribute('data-nudgeplay-controller-added')) {
+      updateControllerStatus(video, controllerNudge, playPauseBtn);
+      if (video.playbackRate !== 1) {
+        chrome.storage.local.set({ [`speed_${currentHostname}`]: video.playbackRate });
+      }
+    }
+
   });
   
   // Add click handler to the minimized widget
@@ -370,6 +421,7 @@ function createVideoController(video) {
     // If playback speed is not 1.0, reset to 1.0
     if (video.playbackRate !== 1.0) {
       video.playbackRate = 1.0;
+      chrome.storage.local.set({ [`speed_${currentHostname}`]: 1});
     } else {
       // Otherwise toggle play/pause
       if (video.paused) {
@@ -432,17 +484,19 @@ function createVideoController(video) {
     newSpeed = Math.round(newSpeed * 100) / 100;
     // Limit to minimum 0.1x
     video.playbackRate = Math.max(0.1, newSpeed);
+    chrome.storage.local.set({ [`speed_${currentHostname}`]: newSpeed });
   });
   
   speedUpBtn.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
     
-    let newSpeed = video.playbackRate + 0.2; 
+    let newSpeed = video.playbackRate + 0.1; 
     // Round to 2 decimal places
     newSpeed = Math.round(newSpeed * 100) / 100;
     // Limit to maximum 5x
     video.playbackRate = Math.min(5, newSpeed);
+    chrome.storage.local.set({ [`speed_${currentHostname}`]: newSpeed });
   });
   
   closeBtn.addEventListener('click', (e) => {
@@ -450,18 +504,19 @@ function createVideoController(video) {
     e.stopPropagation();
     
     shadowContainer.remove();
-    video.removeAttribute('data-controller-added');
+    video.removeAttribute('data-nudgeplay-controller-added');
     
     // Remove from active videos list
     activeVideos = activeVideos.filter(v => v !== video);
-    
-    // Store site as disabled
-    if (!disabledSites.includes(currentHostname)) {
-      disabledSites.push(currentHostname);
-      chrome.storage.local.set({ disabledSites }, () => {
-        console.log(`Video controls disabled for ${currentHostname}`);
-      });
-    }
+
+    chrome.storage.local.get('disabledSites', (response) => {
+      const currentDisabledSites = response.disabledSites || [];
+      if (!currentDisabledSites.includes(currentHostname)) {
+        chrome.storage.local.set({ disabledSites: [...currentDisabledSites, currentHostname] }, () => {
+          console.log(`Video controls disabled for ${currentHostname}`);
+        });
+      }
+    })
   });
 }
 
@@ -484,62 +539,5 @@ function updateControllerStatus(video, nudge, playPauseBtn) {
   }
 }
 
-// Listen for messages from the popup or background script
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === 'toggleSiteDisabled') {
-    if (message.disabled) {
-      // Add current site to disabled list
-      if (!disabledSites.includes(currentHostname)) {
-        disabledSites.push(currentHostname);
-      }
-      
-      // Remove all controllers
-      document.querySelectorAll('.video-controls-shadow-container').forEach(container => {
-        container.remove();
-      });
-      
-      document.querySelectorAll('video').forEach(video => {
-        video.removeAttribute('data-controller-added');
-      });
-      
-      // Clear active videos
-      activeVideos = [];
-      
-      // Remove keyboard shortcuts
-      document.removeEventListener('keydown', setupKeyboardShortcuts);
-    } else {
-      // Remove current site from disabled list
-      disabledSites = disabledSites.filter(site => site !== currentHostname);
-      
-      // Reinitialize controllers
-      initializeVideoController();
-      
-      // Setup keyboard shortcuts again
-      setupKeyboardShortcuts();
-    }
-    
-    // Save updated disabled list
-    chrome.storage.local.set({ disabledSites }, () => {
-      console.log('Disabled sites updated:', disabledSites);
-      sendResponse({ success: true });
-    });
-    
-    return true; // Required for asynchronous response
-  }
-  
-  if (message.action === 'updatePlaybackSpeed') {
-    // Find all videos and update their playback speed
-    document.querySelectorAll('video').forEach(video => {
-      video.playbackRate = message.speed;
-    });
-    
-    // Update saved speed for this site
-    chrome.storage.local.set({ [`speed_${currentHostname}`]: message.speed });
-    
-    sendResponse({ success: true });
-    return true;
-  }
-});
-
 // Initialize on page load
-loadDisabledSites();
+init();

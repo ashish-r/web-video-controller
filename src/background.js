@@ -2,12 +2,9 @@
 
 // Initialize storage if needed
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.storage.local.get(['disabledSites', 'defaultSpeed'], (result) => {
+  chrome.storage.local.get(['disabledSites'], (result) => {
     if (!result.disabledSites) {
       chrome.storage.local.set({ disabledSites: [] });
-    }
-    if (!result.defaultSpeed) {
-      chrome.storage.local.set({ defaultSpeed: 1.0 });
     }
   });
 });
@@ -41,28 +38,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     });
     
     // Return true to indicate we'll respond asynchronously
-    return true;
-  }
-  
-  if (message.action === 'setPlaybackSpeed') {
-    // Send message to content script to update speed
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs.length === 0) return;
-      
-      chrome.tabs.sendMessage(
-        tabs[0].id,
-        { 
-          action: 'updatePlaybackSpeed', 
-          speed: message.speed 
-        }
-      );
-      
-      // Store speed for current site
-      chrome.storage.local.set({ [`speed_${message.hostname}`]: message.speed });
-      
-      sendResponse({ success: true });
-    });
-    
     return true;
   }
 });
