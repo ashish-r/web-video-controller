@@ -1,19 +1,19 @@
 // Background script for Video Controls Extension
-
+const extension = typeof browser !== "undefined" ? browser : chrome;
 // Initialize storage if needed
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.storage.local.get(['disabledSites'], (result) => {
+extension.runtime.onInstalled.addListener(() => {
+  extension.storage.local.get(['disabledSites'], (result) => {
     if (!result.disabledSites) {
-      chrome.storage.local.set({ disabledSites: [] });
+      extension.storage.local.set({ disabledSites: [] });
     }
   });
 });
 
 // Listen for messages from popup or content script
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+extension.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'getCurrentSiteStatus') {
     // Get current tab information
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    extension.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs.length === 0) {
         sendResponse({ disabled: false, speed: 1.0 });
         return;
@@ -24,7 +24,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const hostname = url.hostname;
       
       // Get disabled sites and speed from storage
-      chrome.storage.local.get(['disabledSites', `speed_${hostname}`], (result) => {
+      extension.storage.local.get(['disabledSites', `speed_${hostname}`], (result) => {
         const disabledSites = result.disabledSites || [];
         const isDisabled = disabledSites.includes(hostname);
         const speed = result[`speed_${hostname}`] || 1.0;

@@ -1,3 +1,4 @@
+const extension = typeof browser !== "undefined" ? browser : chrome;
 // Global variables
 const currentHostname = window.location.hostname;
 let activeVideos = []; // Track active videos for keyboard shortcuts
@@ -29,7 +30,7 @@ function tearDownUI() {
 function init() {
   let isDisabled = false; // Track if the site is disabled
   
-  chrome.storage.local.get('disabledSites', (result) => {
+  extension.storage.local.get('disabledSites', (result) => {
     const disabledSites = result.disabledSites || [];
     // If site is not disabled, initialize the controller
     if (!disabledSites.includes(currentHostname)) {
@@ -43,7 +44,7 @@ function init() {
     }
   });
 
-  chrome.storage.onChanged.addListener((changes, namespace) => {
+  extension.storage.onChanged.addListener((changes, namespace) => {
     // Only proceed if this is from local storage
     if (namespace !== 'local') return;
     
@@ -104,7 +105,7 @@ function setupKeyboardShortcuts() {
             let newSpeedUp = currentSpeedUp + 0.1;
             newSpeedUp = Math.min(5, Math.round(newSpeedUp * 100) / 100);
             targetVideo.playbackRate = newSpeedUp;
-            chrome.storage.local.set({ [`speed_${currentHostname}`]: newSpeedUp});
+            extension.storage.local.set({ [`speed_${currentHostname}`]: newSpeedUp});
           }
           delete pendingActions[e.key];
         }, 200);
@@ -120,7 +121,7 @@ function setupKeyboardShortcuts() {
             let newSpeedDown = currentSpeedDown - 0.1;
             newSpeedDown = Math.max(0.1, Math.round(newSpeedDown * 100) / 100);
             targetVideo.playbackRate = newSpeedDown;
-            chrome.storage.local.set({ [`speed_${currentHostname}`]: newSpeedDown});
+            extension.storage.local.set({ [`speed_${currentHostname}`]: newSpeedDown});
           }
           delete pendingActions[e.key];
         }, 200);
@@ -199,7 +200,7 @@ function createVideoController(video) {
   // Create shadow root
   const shadowRoot = shadowContainer.attachShadow({ mode: 'closed' });
   
-    chrome.storage.local.get(`speed_${currentHostname}`, (result) => {
+    extension.storage.local.get(`speed_${currentHostname}`, (result) => {
       if (result[`speed_${currentHostname}`]) {
         const savedPlaybackSpeed = result[`speed_${currentHostname}`];
         // Apply saved speed to the video after a short delay to ensure it loads
@@ -386,7 +387,7 @@ function createVideoController(video) {
   video.addEventListener('play', (e) => {
     updateControllerStatus(video, controllerNudge, playPauseBtn);
     controllerContainer.classList.add('playing');
-    chrome.storage.local.get(`speed_${currentHostname}`, (result) => {
+    extension.storage.local.get(`speed_${currentHostname}`, (result) => {
       if (result[`speed_${currentHostname}`]) {
         const savedPlaybackSpeed = result[`speed_${currentHostname}`];
         // Apply saved speed to the video after a short delay to ensure it loads
@@ -407,7 +408,7 @@ function createVideoController(video) {
     if (video.hasAttribute('data-nudgeplay-controller-added')) {
       updateControllerStatus(video, controllerNudge, playPauseBtn);
       if (video.playbackRate !== 1) {
-        chrome.storage.local.set({ [`speed_${currentHostname}`]: video.playbackRate });
+        extension.storage.local.set({ [`speed_${currentHostname}`]: video.playbackRate });
       }
     }
 
@@ -421,7 +422,7 @@ function createVideoController(video) {
     // If playback speed is not 1.0, reset to 1.0
     if (video.playbackRate !== 1.0) {
       video.playbackRate = 1.0;
-      chrome.storage.local.set({ [`speed_${currentHostname}`]: 1});
+      extension.storage.local.set({ [`speed_${currentHostname}`]: 1});
     } else {
       // Otherwise toggle play/pause
       if (video.paused) {
@@ -484,7 +485,7 @@ function createVideoController(video) {
     newSpeed = Math.round(newSpeed * 100) / 100;
     // Limit to minimum 0.1x
     video.playbackRate = Math.max(0.1, newSpeed);
-    chrome.storage.local.set({ [`speed_${currentHostname}`]: newSpeed });
+    extension.storage.local.set({ [`speed_${currentHostname}`]: newSpeed });
   });
   
   speedUpBtn.addEventListener('click', (e) => {
@@ -496,7 +497,7 @@ function createVideoController(video) {
     newSpeed = Math.round(newSpeed * 100) / 100;
     // Limit to maximum 5x
     video.playbackRate = Math.min(5, newSpeed);
-    chrome.storage.local.set({ [`speed_${currentHostname}`]: newSpeed });
+    extension.storage.local.set({ [`speed_${currentHostname}`]: newSpeed });
   });
   
   closeBtn.addEventListener('click', (e) => {
@@ -509,10 +510,10 @@ function createVideoController(video) {
     // Remove from active videos list
     activeVideos = activeVideos.filter(v => v !== video);
 
-    chrome.storage.local.get('disabledSites', (response) => {
+    extension.storage.local.get('disabledSites', (response) => {
       const currentDisabledSites = response.disabledSites || [];
       if (!currentDisabledSites.includes(currentHostname)) {
-        chrome.storage.local.set({ disabledSites: [...currentDisabledSites, currentHostname] }, () => {
+        extension.storage.local.set({ disabledSites: [...currentDisabledSites, currentHostname] }, () => {
           console.log(`Video controls disabled for ${currentHostname}`);
         });
       }

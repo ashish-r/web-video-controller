@@ -1,3 +1,4 @@
+const extension = typeof browser !== "undefined" ? browser : chrome;
 // Get DOM elements
 const siteToggle = document.getElementById('site-toggle');
 const toggleStatus = document.getElementById('toggle-status');
@@ -11,7 +12,7 @@ let currentHostname = '';
 // Initialize the popup
 function initPopup() {
   // Get current site status
-  chrome.runtime.sendMessage({ action: 'getCurrentSiteStatus' }, (response) => {
+  extension.runtime.sendMessage({ action: 'getCurrentSiteStatus' }, (response) => {
     // If we don't have a valid hostname, disable the controls
     if (!response?.hostname) {
       siteToggle.disabled = true;
@@ -28,8 +29,8 @@ function initPopup() {
     handleDisableChange(response.disabled);
     updateSpeedPresetButtons(response.speed);
 
-    // Add listener for chrome.storage.local changes
-    chrome.storage.onChanged.addListener((changes, namespace) => {
+    // Add listener for extension.storage.local changes
+    extension.storage.onChanged.addListener((changes, namespace) => {
       // Only proceed if this is from local storage
       if (namespace !== 'local') return;
       
@@ -73,7 +74,7 @@ siteToggle.addEventListener('change', () => {
   handleDisableChange(!isEnabled)
   
   
-  chrome.storage.local.get(['disabledSites'], (result) => {
+  extension.storage.local.get(['disabledSites'], (result) => {
     const disabledSites = result.disabledSites || [];
     
     if (isEnabled) {
@@ -86,7 +87,7 @@ siteToggle.addEventListener('change', () => {
     }
     
     // Save updated disabled sites list
-    chrome.storage.local.set({ disabledSites: disabledSites });
+    extension.storage.local.set({ disabledSites: disabledSites });
   });
 });
 
@@ -113,7 +114,7 @@ speedPresets.forEach(btn => {
 // Set playback speed
 function setPlaybackSpeed(speed) {
   
-  chrome.storage.local.set({ [`speed_${currentHostname}`]: speed });
+  extension.storage.local.set({ [`speed_${currentHostname}`]: speed });
 }
 
 // Update speed preset buttons
