@@ -225,7 +225,7 @@ function createVideoController(video) {
         user-select: none;
         transition: all 0.3s ease;
         right: 10px;
-        top: 40px;
+        top: 60px;
         transform: scale(0.5); /* Start at 0.5x scale when minimized */
         transform-origin: top right;
       }
@@ -268,8 +268,8 @@ function createVideoController(video) {
         border-radius: 20px;
         padding: 8px;
         position: absolute;
-        top: 40px;
         right: 0;
+        top: 40px;
         white-space: nowrap;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
         border: 1px solid rgba(255, 255, 255, 0.5);
@@ -353,7 +353,7 @@ function createVideoController(video) {
         <button class="controller-btn play-pause" title="Play">►</button>
         <button class="controller-btn speed-down" title="Decrease Speed">−</button>
         <button class="controller-btn speed-up" title="Increase Speed">+</button>
-        <button class="controller-btn close" title="Remove Controller">×</button>
+        <button class="controller-btn close" title="Disable extension for ${currentHostname}">×</button>
       </div>
     </div>
   `;
